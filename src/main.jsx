@@ -27,6 +27,7 @@ function AppInner() {
 
   const isAuthenticated = !!user || isGuest
 
+  // Redirect ke home setelah user beneran login (bukan guest)
   useEffect(() => {
     if (!authLoading && user) {
       if (currentPage === 'login' || currentPage === 'register') {
@@ -60,6 +61,7 @@ function AppInner() {
   }
 
   const renderPage = () => {
+    // Belum login & bukan guest → paksa ke login / register
     if (!isAuthenticated && currentPage !== 'register') {
       return <LoginPage onNavigate={navigate} />
     }
@@ -112,27 +114,23 @@ function AppInner() {
     }
   }
 
+  const pageElement = renderPage()
+
+  // Halaman auth kalau belum authenticated atau page login/register
   const isAuthPage =
     !isAuthenticated || currentPage === 'login' || currentPage === 'register'
 
   return (
     <div className="min-h-screen bg-slate-950 bg-[radial-gradient(circle_at_top,_#0f172a,_#020617)] flex flex-col pb-16">
-      {/* Navbar */}
       <Navbar
         currentPage={currentPage}
         onNavigate={navigate}
         isAuthPage={isAuthPage}
       />
-
-      <div className="flex-1">
-        {renderPage()}
-      </div>
-
-      {/* BottomNav */}
+      <div className="flex-1">{pageElement}</div>
       {!isAuthPage && isAuthenticated && (
         <BottomNav currentPage={currentPage} onNavigate={navigate} />
       )}
-
       <PWABadge />
     </div>
   )

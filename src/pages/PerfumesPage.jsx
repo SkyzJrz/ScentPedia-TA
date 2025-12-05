@@ -1,28 +1,67 @@
 // src/pages/PerfumesPage.jsx
-import { useMemo, useState } from 'react'
-import { perfumes } from '../data/perfumes'
+import { useEffect, useMemo, useState } from 'react'
+import { fetchPerfumesWithFallback } from '../api/perfumesApi'
 
 export default function PerfumesPage({ onSelectPerfume }) {
+  const [perfumes, setPerfumes] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [source, setSource] = useState('supabase')
+
   const [search, setSearch] = useState('')
   const [brandFilter, setBrandFilter] = useState('all')
   const [sortBy, setSortBy] = useState('name-asc')
 
-  const brands = useMemo(
-    () => Array.from(new Set(perfumes.map((p) => p.brand))),
-    [],
-  )
+  // Ambil data dari Supabase + fallback cache
+  useEffect(() => {
+    let mounted = true
 
+    async function loadPerfumes() {
+      setLoading(true)
+      setError('')
+      try {
+        const result = await fetchPerfumesWithFallback()
+        if (!mounted) return
+        setPerfumes(result.perfumes || [])
+        setSource(result.source)
+      } catch (err) {
+        console.error(err)
+        if (!mounted) return
+        setError('Gagal memuat data parfum.')
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+
+    loadPerfumes()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  // Brand untuk dropdown
+  const brands = useMemo(() => {
+    const set = new Set()
+    perfumes.forEach((p) => {
+      if (p.brand) set.add(p.brand)
+    })
+    return Array.from(set).sort((a, b) => a.localeCompare(b))
+  }, [perfumes])
+
+  // Filter, search, sort
   const filteredPerfumes = useMemo(() => {
     let result = [...perfumes]
 
     if (search.trim() !== '') {
       const q = search.toLowerCase()
-      result = result.filter(
-        (p) =>
+      result = result.filter((p) => {
+        const style = p.style || ''
+        return (
           p.name.toLowerCase().includes(q) ||
           p.brand.toLowerCase().includes(q) ||
-          (p.style && p.style.toLowerCase().includes(q)),
-      )
+          style.toLowerCase().includes(q)
+        )
+      })
     }
 
     if (brandFilter !== 'all') {
@@ -38,7 +77,7 @@ export default function PerfumesPage({ onSelectPerfume }) {
     })
 
     return result
-  }, [search, brandFilter, sortBy])
+  }, [perfumes, search, brandFilter, sortBy])
 
   return (
     <div className="min-h-[calc(100vh-120px)] bg-slate-950 bg-[radial-gradient(circle_at_top,_#1f2937,_#020617)] pb-16">
@@ -46,17 +85,29 @@ export default function PerfumesPage({ onSelectPerfume }) {
         {/* Header */}
         <section className="mb-4">
           <h1 className="text-2xl md:text-3xl font-semibold text-slate-50 leading-snug">
-            Eksplor Koleksi Parfum, 
-          <span className="text-emerald-300"> Temukan Aroma Favoritmu.</span>
+            Eksplor Koleksi Parfum,
+            <span className="text-emerald-300"> Temukan Aroma Favoritmu.</span>
           </h1>
 
           <p className="text-sm text-slate-300 max-w-2xl mt-2">
-           Temukan berbagai pilihan parfum dari aroma fresh, manis, woody, hingga dark amber.
-            Cocok untuk referensi sebelum membeli, mencari rekomendasi, atau mempelajari karakter 
-            notes di dunia wewangian.
+            Temukan berbagai pilihan parfum dari aroma fresh, manis, woody,
+            hingga dark amber. Cocok untuk referensi sebelum membeli, mencari
+            rekomendasi, atau mempelajari karakter notes di dunia wewangian.
           </p>
-        </section>
 
+          {source === 'cache' && (
+            <p className="text-[11px] text-amber-300 mt-1">
+              * Menampilkan data dari cache lokal karena tidak dapat terhubung ke
+              server.
+            </p>
+          )}
+          {source === 'none' && (
+            <p className="text-[11px] text-red-300 mt-1">
+              * Tidak ada data parfum yang tersimpan. Coba aktifkan internet lalu
+              buka ulang aplikasi.
+            </p>
+          )}
+        </section>
 
         {/* Controls */}
         <section className="mb-5 bg-slate-900/80 border border-slate-800 rounded-2xl p-3.5 flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
@@ -115,73 +166,94 @@ export default function PerfumesPage({ onSelectPerfume }) {
           </div>
         </section>
 
+        {/* Status loading / error */}
+        {loading && (
+          <div className="mb-4 bg-slate-900/80 border border-slate-800 rounded-xl p-3 text-xs text-slate-200">
+            Memuat daftar parfum...
+          </div>
+        )}
+
+        {error && !loading && (
+          <div className="mb-4 bg-red-900/40 border border-red-500/40 rounded-xl p-3 text-xs text-red-100">
+            {error}
+          </div>
+        )}
+
         {/* Grid parfums */}
-        <section className="grid md:grid-cols-3 gap-4">
-          {filteredPerfumes.length === 0 && (
-            <div className="col-span-full text-center text-xs text-slate-400 py-8 bg-slate-900/70 rounded-2xl border border-slate-800">
-              Tidak ada parfum yang cocok dengan kriteria pencarian.
-            </div>
-          )}
-
-          {filteredPerfumes.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => onSelectPerfume(p)}
-              className="group bg-slate-900/80 border border-slate-800/80 rounded-2xl overflow-hidden shadow-lg shadow-black/40 hover:shadow-xl hover:shadow-black/60 transition transform hover:-translate-y-1 flex flex-col text-left"
-            >
-              <div className="relative overflow-hidden">
-                <div className="aspect-[3/4] bg-slate-800">
-                  <img
-                    src={p.image}
-                    alt={p.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    loading="lazy"
-                  />
-                </div>
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent" />
-                <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between gap-2">
-                  <span className="inline-flex items-center px-2 py-1 rounded-full bg-black/60 border border-white/10 text-[10px] text-slate-100 backdrop-blur-sm">
-                    {p.brand}
-                  </span>
-                  <span className="inline-flex px-2 py-1 rounded-full bg-slate-50/10 border border-slate-200/30 text-[10px] text-slate-100 backdrop-blur-sm">
-                    {p.style}
-                  </span>
-                </div>
+        {!loading && !error && (
+          <section className="grid md:grid-cols-3 gap-4">
+            {filteredPerfumes.length === 0 && (
+              <div className="col-span-full text-center text-xs text-slate-400 py-8 bg-slate-900/70 rounded-2xl border border-slate-800">
+                Tidak ada parfum yang cocok dengan kriteria pencarian.
               </div>
+            )}
 
-              <div className="p-3.5 flex-1 flex flex-col text-xs text-slate-100">
-                <div className="mb-1">
-                  <h3 className="font-semibold text-[14px] leading-tight">
-                    {p.name}
-                  </h3>
-                  <p className="text-[11px] text-slate-400">by {p.brand}</p>
+            {filteredPerfumes.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => onSelectPerfume(p)}
+                className="group bg-slate-900/80 border border-slate-800/80 rounded-2xl overflow-hidden shadow-lg shadow-black/40 hover:shadow-xl hover:shadow-black/60 transition transform hover:-translate-y-1 flex flex-col text-left"
+              >
+                <div className="relative overflow-hidden">
+                  <div className="aspect-[3/4] bg-slate-800">
+                    <img
+                      src={p.image}
+                      alt={p.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      loading="lazy"
+                    />
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent" />
+                  <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center px-2 py-1 rounded-full bg-black/60 border border-white/10 text-[10px] text-slate-100 backdrop-blur-sm">
+                      {p.brand}
+                    </span>
+                    {p.style && (
+                      <span className="inline-flex px-2 py-1 rounded-full bg-slate-50/10 border border-slate-200/30 text-[10px] text-slate-100 backdrop-blur-sm">
+                        {p.style}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                <p className="text-[11px] text-slate-300 mt-1 mb-2 line-clamp-3">
-                  {p.description}
-                </p>
+                <div className="p-3.5 flex-1 flex flex-col text-xs text-slate-100">
+                  <div className="mb-1">
+                    <h3 className="font-semibold text-[14px] leading-tight">
+                      {p.name}
+                    </h3>
+                    <p className="text-[11px] text-slate-400">by {p.brand}</p>
+                  </div>
 
-                <div className="space-y-1.5 mt-auto">
-                  <NotesRow label="Top" notes={p.topNotes} color="emerald" />
-                  <NotesRow label="Middle" notes={p.middleNotes} color="sky" />
-                  <NotesRow label="Base" notes={p.baseNotes} color="amber" />
+                  <p className="text-[11px] text-slate-300 mt-1 mb-2 line-clamp-3">
+                    {p.description}
+                  </p>
+
+                  <div className="space-y-1.5 mt-auto">
+                    <NotesRow label="Top" notes={p.topNotes} color="emerald" />
+                    <NotesRow label="Middle" notes={p.middleNotes} color="sky" />
+                    <NotesRow label="Base" notes={p.baseNotes} color="amber" />
+                  </div>
+
+                  {p.occasion && (
+                    <p className="text-[10px] text-slate-400 mt-2 pt-1 border-t border-slate-800">
+                      Occasion:{' '}
+                      <span className="text-slate-200 font-medium">
+                        {p.occasion}
+                      </span>
+                    </p>
+                  )}
                 </div>
-
-                <p className="text-[10px] text-slate-400 mt-2 pt-1 border-t border-slate-800">
-                  Occasion:{' '}
-                  <span className="text-slate-200 font-medium">{p.occasion}</span>
-                </p>
-              </div>
-            </button>
-          ))}
-        </section>
+              </button>
+            ))}
+          </section>
+        )}
       </main>
     </div>
   )
 }
 
-function NotesRow({ label, notes, color }) {
+function NotesRow({ label, notes = [], color }) {
   const colorClasses =
     {
       emerald: {
@@ -210,7 +282,7 @@ function NotesRow({ label, notes, color }) {
         {label}
       </span>
       <p className="text-[10px] text-slate-300 leading-snug">
-        {notes.join(', ')}
+        {notes && notes.length > 0 ? notes.join(', ') : '-'}
       </p>
     </div>
   )

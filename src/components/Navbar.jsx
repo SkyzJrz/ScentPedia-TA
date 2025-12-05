@@ -2,7 +2,7 @@
 import React from "react";
 import { useAuth } from "../context/AuthContext";
 
-export default function Navbar({ onNavigate }) {
+export default function Navbar({ currentPage, onNavigate, isAuthPage }) {
   const { user, isGuest, signOut } = useAuth();
 
   return (
@@ -11,8 +11,12 @@ export default function Navbar({ onNavigate }) {
 
         {/* Logo + Brand */}
         <div
-          className="flex items-center gap-3 cursor-pointer select-none"
-          onClick={() => onNavigate && onNavigate("home")}
+          className={`flex items-center gap-3 ${
+            !isAuthPage ? "cursor-pointer" : "cursor-default"
+          } select-none`}
+          onClick={() => {
+            if (!isAuthPage && onNavigate) onNavigate("home");
+          }}
         >
           <div className="h-10 w-10 rounded-full overflow-hidden shadow-[0_0_12px_rgba(248,113,113,0.6)] bg-slate-800 flex items-center justify-center">
             <img
@@ -32,27 +36,28 @@ export default function Navbar({ onNavigate }) {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        {!isAuthPage && (
+          <div className="flex items-center gap-3">
+            {user && !isGuest && (
+              <button
+                onClick={signOut}
+                className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 transition rounded-lg text-white text-sm font-medium shadow-md"
+              >
+                Logout
+              </button>
+            )}
+            
+            {(!user || isGuest) && (
+              <button
+                onClick={() => onNavigate && onNavigate("login")}
+                className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 transition rounded-lg text-white text-sm font-medium shadow-md"
+              >
+                Login
+              </button>
+            )}
+          </div>
+        )}
 
-          {user && !isGuest && (
-            <button
-              onClick={signOut}
-              className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 transition rounded-lg text-white text-sm font-medium shadow-md"
-            >
-              Logout
-            </button>
-          )}
-
-          {(!user || isGuest) && (
-            <button
-              onClick={() => onNavigate && onNavigate("login")}
-              className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 transition rounded-lg text-white text-sm font-medium shadow-md"
-            >
-              Login
-            </button>
-          )}
-
-        </div>
       </div>
     </nav>
   );
